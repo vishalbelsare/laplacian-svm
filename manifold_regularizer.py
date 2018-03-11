@@ -24,6 +24,8 @@ class ManifoldRegularizer(object):
             
             self.kernel = kernel
         
+        
+        self.threshold = self.kernel(np.array([0,0,0]), np.array([0,0,0]))
         self.gamma_a = gamma_a
         
         self.gamma_i = gamma_i
@@ -112,7 +114,7 @@ class ManifoldRegularizer(object):
 
     def predict(self, X_test):
         predi = []
-        decision = lambda x: 1 if x>=1 else 0
+        decision = lambda x: 1 if x>=self.threshold else 0
         for j in range(X_test.shape[0]):
             
             predi.append( sum([self.alpha[i] * self.kernel(self.X[i], X_test[j]) for i in range(self.X.shape[0])]))
