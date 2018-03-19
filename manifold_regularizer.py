@@ -18,6 +18,7 @@ class ManifoldRegularizer(object):
     def __init__(self, kernel=None, gamma_i=1, gamma_a=0.03125):
         
         if kernel is None:
+            
             self.kernel = np.dot
             
         else: 
@@ -26,6 +27,7 @@ class ManifoldRegularizer(object):
         
         
         self.threshold = self.kernel(np.array([0,0,0]), np.array([0,0,0]))
+        #self.threshold  = 0
         self.gamma_a = gamma_a
         
         self.gamma_i = gamma_i
@@ -46,10 +48,10 @@ class ManifoldRegularizer(object):
     
     def _get_Q(self, K, L, X):
         
-        self.mapping_beta_to_alpha = np.linalg.inv(2 * self.gamma_a * np.identity(K.shape[0]) +2 * self.gamma_i * (1/(K.shape[0])**2 * np.dot(L,K)))
+        self.mapping_beta_to_alpha = np.linalg.inv(2 * self.gamma_a * np.identity(K.shape[0]) + 2 * self.gamma_i * (1/(K.shape[0])**2 * np.dot(L,K)))
         return self.mapping_beta_to_alpha
 
-    def get_alphas(self, clf, X, y):
+    def get_alphas_svm(self, clf, X, y):
         
         beta = np.zeros(y.size)
         beta[clf.support_] = clf.dual_coef_
@@ -76,7 +78,7 @@ class ManifoldRegularizer(object):
     
     def _get_regularized_kernel(self, X):
         
-        W, K, L = self._get_W_K_L(X)
+        _, K, L = self._get_W_K_L(X)
         return np.dot(K, self._get_Q(K, L, X))
     
     def _get_adjusted_regularized_kernel(self, X, y):
@@ -114,15 +116,40 @@ class ManifoldRegularizer(object):
 
     def predict(self, X_test):
         predi = []
-        decision = lambda x: 1 if x>=self.threshold else 0
+        
+        
         for j in range(X_test.shape[0]):
             
             predi.append( sum([self.alpha[i] * self.kernel(self.X[i], X_test[j]) for i in range(self.X.shape[0])]))
+        
+
+        #self.threshold = np.median(predi)
+        decision = lambda x: 1 if x>=self.threshold else 0
         predi = [decision(i) for i in predi]
         return np.array(predi)
     
+    
+    def get_alphas_rls(self, X, y):
+        
+        
+
+        J = np.zeros((X.shape[0], X.shape[0]))
+        
+        for i in range(y.size):
+            
+            J[i][i] = 1
+            
+        _, L, K = self._get_W_K_L( X)
+
+        y = np.append(y, np.zeros(X[:,0].size-y.size))
+        
+        return np.dot(np.linalg.inv( np.dot(J, K) + self.gamma_a * y.size * np.identity(X.shape[0]) + np.dot(L, K) * (self.gamma_i * y.size/X.shape[0]**2)), y) 
+         
+    
     def fit(self, X, y):
+        
         self.X = X
+        print(self._create_diagonal_matrix(np.array([1,2,3,4,5])))
         self.size = X.shape[0]
         self.n_labels = y.size
         self.n_unlabelled_points = self.size - self.n_labels 
@@ -132,6 +159,11 @@ class ManifoldRegularizer(object):
 
         clf = svm.SVC(kernel='precomputed', C=self.gamma_a)
         clf.fit(regularized_kernel, y) 
-        self.alpha = self.get_alphas(clf, X, y)
-        
+        self.alpha = self.get_alphas_svm(clf, X, y)
+        #print(self.alpha)
         self.plot_decision_region(X, np.append(y, 3*np.ones(X[:,0].size-y.size)), clf)
+        #print(self.get_alphas_rls(X, y))
+        
+        
+        
+        
